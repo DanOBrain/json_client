@@ -11,14 +11,10 @@ import (
 	"time"
 )
 
-// ==================== Domain Models ====================
-
-// BaseResource represents common fields for all resources
 type BaseResource struct {
 	ID int `json:"id"`
 }
 
-// Post represents a post from JSONPlaceholder
 type Post struct {
 	UserID int    `json:"userId"`
 	ID     int    `json:"id"`
@@ -26,7 +22,6 @@ type Post struct {
 	Body   string `json:"body"`
 }
 
-// Comment represents a comment from JSONPlaceholder
 type Comment struct {
 	PostID int    `json:"postId"`
 	ID     int    `json:"id"`
@@ -35,14 +30,12 @@ type Comment struct {
 	Body   string `json:"body"`
 }
 
-// Album represents an album from JSONPlaceholder
 type Album struct {
 	UserID int    `json:"userId"`
 	ID     int    `json:"id"`
 	Title  string `json:"title"`
 }
 
-// Photo represents a photo from JSONPlaceholder
 type Photo struct {
 	AlbumID      int    `json:"albumId"`
 	ID           int    `json:"id"`
@@ -51,7 +44,6 @@ type Photo struct {
 	ThumbnailURL string `json:"thumbnailUrl"`
 }
 
-// Todo represents a todo from JSONPlaceholder
 type Todo struct {
 	UserID    int    `json:"userId"`
 	ID        int    `json:"id"`
@@ -59,7 +51,6 @@ type Todo struct {
 	Completed bool   `json:"completed"`
 }
 
-// User represents a user from JSONPlaceholder
 type User struct {
 	ID       int    `json:"id"`
 	Name     string `json:"name"`
@@ -69,7 +60,6 @@ type User struct {
 	Website  string `json:"website"`
 }
 
-// ResourceType defines the type of resource
 type ResourceType string
 
 const (
@@ -81,14 +71,11 @@ const (
 	ResourceUsers    ResourceType = "users"
 )
 
-// Resource interface for generic handling
 type Resource interface {
 	GetID() int
 	GetType() ResourceType
 	GetDisplayName() string
 }
-
-// Implement Resource interface for each type
 
 func (p Post) GetID() int             { return p.ID }
 func (p Post) GetType() ResourceType  { return ResourcePosts }
@@ -114,7 +101,6 @@ func (u User) GetID() int             { return u.ID }
 func (u User) GetType() ResourceType  { return ResourceUsers }
 func (u User) GetDisplayName() string { return u.Name }
 
-// ProcessedResource represents a resource after processing
 type ProcessedResource struct {
 	ID          int
 	Type        ResourceType
@@ -124,18 +110,16 @@ type ProcessedResource struct {
 	ProcessedAt time.Time
 }
 
-// Config holds application configuration
 type Config struct {
 	Resource   ResourceType
 	ID         int
 	UserID     int
 	Limit      int
-	Expand     bool // Fetch related resources
+	Expand     bool
 	APIBaseURL string
 	Timeout    time.Duration
 }
 
-// APIError represents API error
 type APIError struct {
 	Message string
 	Status  int
@@ -149,14 +133,10 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("Ошибка API: %s", e.Message)
 }
 
-// ==================== HTTP Client ====================
-
-// HTTPClient interface
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// APIClient handles all API communication
 type APIClient struct {
 	client  HTTPClient
 	baseURL string
@@ -169,7 +149,6 @@ func NewAPIClient(client HTTPClient, baseURL string) *APIClient {
 	}
 }
 
-// Generic fetch method
 func (c *APIClient) Fetch(resource ResourceType, id int, userID int) ([]interface{}, error) {
 	var url string
 
@@ -204,7 +183,6 @@ func (c *APIClient) Fetch(resource ResourceType, id int, userID int) ([]interfac
 	return c.decodeResponse(resp, resource, id)
 }
 
-// Decode response based on resource type
 func (c *APIClient) decodeResponse(resp *http.Response, resource ResourceType, id int) ([]interface{}, error) {
 	var result []interface{}
 
@@ -315,7 +293,6 @@ func (c *APIClient) decodeResponse(resp *http.Response, resource ResourceType, i
 	return result, nil
 }
 
-// Fetch related resources (e.g., comments for a post)
 func (c *APIClient) FetchRelated(resource ResourceType, id int, related ResourceType) ([]interface{}, error) {
 	url := fmt.Sprintf("%s/%s/%d/%s", c.baseURL, resource, id, related)
 
@@ -340,9 +317,6 @@ func (c *APIClient) FetchRelated(resource ResourceType, id int, related Resource
 	return c.decodeResponse(resp, related, 0)
 }
 
-// ==================== Processors ====================
-
-// ResourceProcessor processes different resource types
 type ResourceProcessor struct{}
 
 func NewResourceProcessor() *ResourceProcessor {
@@ -457,7 +431,6 @@ func (p *ResourceProcessor) Process(resource interface{}) ProcessedResource {
 	}
 }
 
-// Helper function to truncate strings
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -465,9 +438,6 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// ==================== Formatter ====================
-
-// OutputFormatter handles output formatting
 type OutputFormatter struct{}
 
 func NewOutputFormatter() *OutputFormatter {
@@ -590,9 +560,7 @@ func translateKey(key string) string {
 	return key
 }
 
-// ==================== Pipeline Stages ====================
-
-// Stage 1: Fetch resources
+// Этап 1
 func fetchStage(config Config, client *APIClient) (<-chan interface{}, <-chan error) {
 	out := make(chan interface{})
 	errCh := make(chan error, 1)
@@ -623,7 +591,7 @@ func fetchStage(config Config, client *APIClient) (<-chan interface{}, <-chan er
 	return out, errCh
 }
 
-// Stage 2: Process resources (fan-out)
+// Этап 2
 func processStage(workerCount int, resources <-chan interface{}, processor *ResourceProcessor) <-chan ProcessedResource {
 	out := make(chan ProcessedResource)
 
@@ -651,7 +619,7 @@ func processStage(workerCount int, resources <-chan interface{}, processor *Reso
 	return out
 }
 
-// Stage 3: Enrich resources with related data (optional)
+// Этап 3
 func enrichStage(config Config, client *APIClient, processed <-chan ProcessedResource) (<-chan ProcessedResource, <-chan error) {
 	out := make(chan ProcessedResource)
 	errCh := make(chan error, 10)
@@ -716,20 +684,18 @@ func enrichStage(config Config, client *APIClient, processed <-chan ProcessedRes
 	return out, errCh
 }
 
-// Stage 4: Collect and sort results (fan-in)
+// Этап 4
 func collectStage(processed <-chan ProcessedResource, limit int) <-chan ProcessedResource {
 	out := make(chan ProcessedResource)
 
 	go func() {
 		defer close(out)
 
-		// Collect all processed resources
 		resources := make([]ProcessedResource, 0)
 		for res := range processed {
 			resources = append(resources, res)
 		}
 
-		// Sort by ID
 		for i := 0; i < len(resources)-1; i++ {
 			for j := i + 1; j < len(resources); j++ {
 				if resources[i].ID > resources[j].ID {
@@ -795,15 +761,12 @@ func errorAggregator(errChannels ...<-chan error) <-chan error {
 	return out
 }
 
-// ==================== Main ====================
-
 func main() {
-	// Parse command line arguments
 	resource := flag.String("resource", "posts", "Ресурс: posts, comments, albums, photos, todos, users")
 	id := flag.Int("id", 0, "Конкретный ID для загрузки (0 - все)")
 	userID := flag.Int("user", 0, "Фильтр по ID пользователя")
 	limit := flag.Int("limit", 0, "Лимит результатов (0 - без лимита)")
-	workers := flag.Int("workers", 3, "Количество рабочих горутин")
+	workers := flag.Int("workers", 3, "Количество рабочих процессов")
 	expand := flag.Bool("expand", false, "Загружать связанные ресурсы")
 	timeout := flag.Duration("timeout", 10*time.Second, "Таймаут API")
 	help := flag.Bool("help", false, "Показать справку")
@@ -815,12 +778,6 @@ func main() {
 		return
 	}
 
-	// Validate input
-	if *workers < 1 {
-		log.Fatal("Количество рабочих должно быть не менее 1")
-	}
-
-	// Create configuration
 	config := Config{
 		Resource:   ResourceType(*resource),
 		ID:         *id,
@@ -838,41 +795,31 @@ func main() {
 
 	startTime := time.Now()
 
-	// Build pipeline
-	log.Printf("Запуск Веб-Клиента для %s с %d рабочими (расширение=%v)",
-		translateResource(string(config.Resource)), *workers, config.Expand)
-
-	// Stage 1: Fetch
+	// Этап 1
 	resourcesCh, fetchErrCh := fetchStage(config, apiClient)
-
-	// Stage 2: Process (fan-out)
+	// Этап 2
 	processedCh := processStage(*workers, resourcesCh, processor)
-
-	// Stage 3: Enrich (optional)
+	// Этап 3
 	enrichedCh, enrichErrCh := enrichStage(config, apiClient, processedCh)
-
-	// Stage 4: Collect
+	// Этап 4
 	collectedCh := collectStage(enrichedCh, config.Limit)
-
-	// Stage 5: Format
+	// Этап 5
 	outputCh := formatStage(collectedCh)
-
-	// Error handling
+	// Ошибки
 	errCh := errorAggregator(fetchErrCh, enrichErrCh)
 
-	// Output results
 	fmt.Printf("\n%s\n", strings.Repeat("=", 60))
 	fmt.Printf("Веб-Клиент - %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Printf("\n%s\n", strings.Repeat("=", 60))
 
-	// Error handler goroutine
+	// Вывод ошибок
 	go func() {
 		for err := range errCh {
 			log.Printf("⚠️ Ошибка: %v\n", err)
 		}
 	}()
 
-	// Display results
+	// Вывод результата
 	count := 0
 	for line := range outputCh {
 		fmt.Print(line)

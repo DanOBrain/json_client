@@ -68,7 +68,7 @@ func main() {
 	// Процесс получения комментариев каждого поста
 	for _, p := range posts {
 		go func(p models.Post) {
-			// Получаем комментарии
+			// Получение комментариев
 			comments, err := api.GetComments(p.ID)
 			if err != nil {
 				ch <- result{err: err}
